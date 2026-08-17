@@ -1,0 +1,6 @@
+# 运行时生成 / 含敏感信息，切勿提交
+.state/
+.env
+__pycache__/
+*.pyc
+sample_email*.eml

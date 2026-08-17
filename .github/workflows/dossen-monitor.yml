@@ -1,0 +1,79 @@
+# ============================================================================
+#  dossen.com 宾客严重投诉问责 · 微信监控（GitHub Actions 免费云端版）
+# ----------------------------------------------------------------------------
+#  免费、无需服务器、无需电脑常开：
+#    GitHub 每次到点临时拉起一台 Linux 虚拟机运行脚本，跑完即销毁。
+#  工作流触发：
+#    1) schedule  —— 工作日下午每 5 分钟轮询（北京时间 15:00–19:55）
+#    2) workflow_dispatch —— 手动点「Run workflow」触发；mode=test 时只检查不推送
+#
+#  部署：把本文件放到仓库 .github/workflows/ ，把 dossen_complaint_monitor.py
+#        放到仓库根目录，并在 Settings → Secrets → Actions 配置下方所需密钥。
+# ============================================================================
+
+name: dossen-complaint-monitor
+
+on:
+  schedule:
+    # 北京时间 15:00–19:55 = UTC 07:00–11:55；工作日 1-5
+    - cron: '*/5 7-11 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'normal = 正式运行；test = 仅检查提取字段不推送'
+        required: false
+        default: 'normal'
+
+concurrency:
+  group: dossen-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 去重缓存：Message-ID 列表 + 当日标记，跨次运行持久化（否则每次都会重复推送）
+      - name: Restore dedup cache
+        uses: actions/cache@v4
+        with:
+          path: .state
+          key: dossen-state-v1
+          restore-keys: |
+            dossen-state-v1
+
+      - name: Decide run mode (EOD / poll / inspect)
+        id: decide
+        run: |
+          export TZ=Asia/Shanghai
+          H=$(date +%H); M=$(date +%M)
+          echo "Beijing time: $H:$M"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "test" ]; then
+            echo "args=--inspect" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # 19:54 之后（含时区漂移）视为收尾：当天无命中才发一次「今日无问责」
+          if [ "$H" -ge 20 ] || { [ "$H" -eq 19 ] && [ "$M" -ge 54 ]; }; then
+            echo "args=--eod" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run monitor
+        env:
+          QQ_MAIL_USER: ${{ secrets.QQ_MAIL_USER }}
+          QQ_MAIL_AUTH: ${{ secrets.QQ_MAIL_AUTH }}
+          IMAP_HOST: ${{ secrets.IMAP_HOST || 'imap.exmail.qq.com' }}
+          IMAP_PORT: '993'
+          NOTIFIER: ${{ secrets.NOTIFIER || 'pushplus' }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+        run: |
+          python3 dossen_complaint_monitor.py ${{ steps.decide.outputs.args }}
