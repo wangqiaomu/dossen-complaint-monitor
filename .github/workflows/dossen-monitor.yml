@@ -8,7 +8,7 @@
 #    2) workflow_dispatch —— 手动点「Run workflow」触发；mode=test 时只检查不推送
 #
 #  部署：把本文件放到仓库 .github/workflows/ ，把 dossen_complaint_monitor.py
-#        放到仓库根目录，并在 Settings → Secrets → Actions 配置下方所需密钥。
+#        放到仓库根目录，并在 Settings → Secrets → Actions 配置所需密钥。
 # ============================================================================
 
 name: dossen-complaint-monitor
@@ -69,9 +69,9 @@ jobs:
         env:
           QQ_MAIL_USER: ${{ secrets.QQ_MAIL_USER }}
           QQ_MAIL_AUTH: ${{ secrets.QQ_MAIL_AUTH }}
-          IMAP_HOST: ${{ secrets.IMAP_HOST || 'imap.exmail.qq.com' }}
+          IMAP_HOST: ${{ secrets.IMAP_HOST }}
           IMAP_PORT: '993'
-          NOTIFIER: ${{ secrets.NOTIFIER || 'pushplus' }}
+          NOTIFIER: ${{ secrets.NOTIFIER }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
           WECOM_WEBHOOK: ${{ secrets.WECOM_WEBHOOK }}
           SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
